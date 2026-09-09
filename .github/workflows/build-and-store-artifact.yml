@@ -1,0 +1,56 @@
+name: Build & Store Artifact
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build (compile to bytecode)
+        run: |
+          mkdir -p dist
+          cp app.py requirements.txt dist/
+          python -m compileall dist
+
+      - name: Zip build output
+        run: |
+          cd dist
+          zip -r "$GITHUB_WORKSPACE/build-output.zip" .
+
+      - name: Upload temporary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output-temp
+          path: build-output.zip
+          retention-days: 1
+
+  store:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-output-temp
+
+      - name: Upload as final artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-build
+          path: build-output.zip
+          retention-days: 5
